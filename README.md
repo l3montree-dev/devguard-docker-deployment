@@ -13,6 +13,12 @@
 
 ## Setup
 
+Clone this repo first.
+
+```bash
+git clone git@github.com:l3montree-dev/devguard-docker-deployment.git
+```
+
 ### Guided / Automatic
 
 The easiest way to get started is the interactive setup which let's you
