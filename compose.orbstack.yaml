@@ -1,0 +1,10 @@
+services:
+  devguard-api:
+    labels:
+      - dev.orbstack.domains=${DEVGUARD_API_DOMAIN}
+      - dev.orbstack.http-port=8080
+
+  devguard-web:
+    labels:
+      - dev.orbstack.domains=${DEVGUARD_WEB_DOMAIN}
+      - dev.orbstack.http-port=3000

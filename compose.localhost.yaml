@@ -1,0 +1,8 @@
+services:
+  devguard-api:
+    ports:
+      - "8080:8080"
+  
+  devguard-web:
+    ports:
+      - "3000:3000"

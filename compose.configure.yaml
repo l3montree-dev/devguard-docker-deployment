@@ -1,0 +1,14 @@
+# Interactive first-time configuration.
+# Runs the Bun setup script in a throwaway container so no host tooling
+# (bun / node / openssl) is required — only Docker. Identical on every OS:
+#
+#   docker compose -f compose.configure.yaml run --rm configure
+#
+services:
+  configure:
+    image: oven/bun:1
+    working_dir: /app
+    # Mount the repo so the generated .env is written back to the host.
+    volumes:
+      - ./:/app
+    command: ["bun", "run", "dev/setup.ts"]

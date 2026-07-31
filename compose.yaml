@@ -1,0 +1,157 @@
+services:
+  postgresql:
+    image: ghcr.io/l3montree-dev/devguard/postgresql:${POSTGRESQL_TAG}
+    shm_size: 1g
+    security_opt:
+      - no-new-privileges:true
+    #depends_on:
+    #  devguard-setup:
+    #    condition: service_completed_successfully
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_DEVGUARD_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_DEVGUARD_USER}
+      POSTGRES_DB: ${POSTGRES_DEVGUARD_DB}
+    #ports:
+    #  - "5432:5432" # do not expose this unless you know what you're doing
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    tmpfs: 
+      - /run/postgresql:rw,uid=999,gid=999
+    networks:
+      - devguard-local
+
+  kratos-migrate:
+    image: oryd/kratos:${ORY_KRATOS_TAG}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - kratos-config:/etc/config/kratos:ro
+    env_file:
+      - .kratos.env
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    networks:
+      - devguard-local
+
+  kratos:
+    image: oryd/kratos:${ORY_KRATOS_TAG}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "53111"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      kratos-migrate:
+        condition: service_started
+    volumes:
+      - kratos-config:/etc/config/kratos:ro
+    #ports:
+      #- "4433:4433"  # Public
+      #- "4434:4434"  # Admin
+    env_file:
+      - .kratos.env
+    command: serve -c /etc/config/kratos/kratos.yml --watch-courier
+    networks:
+      - devguard-local
+
+  devguard-migrate:
+    image: ghcr.io/l3montree-dev/devguard:${DEVGUARD_API_TAG}
+    read_only: true
+    tmpfs:
+      - /tmp:size=8G,uid=53111,gid=53111
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "53111"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - encryption-key:/keys:ro
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_DEVGUARD_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_DEVGUARD_USER}
+      POSTGRES_DB: ${POSTGRES_DEVGUARD_DB}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      FRONTEND_URL: ${DEVGUARD_FRONTEND_URL}
+      APP_SIDE_ENCRYPTION_KEY_PATH: /keys/app_side_encryption.key
+    command: ["devguard-cli", "migrate"]
+    networks:
+      - devguard-local
+
+  devguard-api:
+    image: ghcr.io/l3montree-dev/devguard:${DEVGUARD_API_TAG}
+    read_only: true
+    tmpfs:
+      - /tmp:size=8G,uid=53111,gid=53111
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "53111"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      kratos:
+        condition: service_started
+      devguard-migrate:
+        condition: service_completed_successfully
+    volumes:
+      - encryption-key:/keys:ro
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_DEVGUARD_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_DEVGUARD_USER}
+      POSTGRES_DB: ${POSTGRES_DEVGUARD_DB}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      ORY_KRATOS_PUBLIC: ${ORY_SDK_URL}
+      ORY_KRATOS_ADMIN: ${ORY_ADMIN_URL}
+      LOG_LEVEL: ${DEVGUARD_LOG_LEVEL}
+      APP_SIDE_ENCRYPTION_KEY_PATH: ${APP_SIDE_ENCRYPTION_KEY_PATH}
+      INSTANCE_DOMAIN: ${DEVGUARD_API_URL}
+      FRONTEND_URL: ${DEVGUARD_FRONTEND_URL}
+    networks:
+      - devguard-local
+
+  devguard-web:
+    image: ghcr.io/l3montree-dev/devguard-web:${DEVGUARD_WEB_TAG}
+    read_only: true
+    tmpfs:
+      - /tmp:size=100M,uid=53111,gid=53111
+      - /app/.next/cache:size=500M,uid=53111,gid=53111
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      - devguard-api
+    environment:
+      DEVGUARD_API_URL: http://devguard-api:8080
+      ORY_SDK_URL: ${ORY_SDK_URL}
+      ORY_SDK_PUBLIC_URL: ${DEVGUARD_FRONTEND_URL}
+    networks:
+      - devguard-local
+
+volumes:
+  postgres:
+  encryption-key:
+  kratos-config:
+
+networks:
+  devguard-local:
+    name: devguard-local

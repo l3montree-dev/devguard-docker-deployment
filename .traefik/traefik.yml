@@ -1,0 +1,14 @@
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+api:
+  insecure: false # [DEBUGGING] Traefik dashboard, disable in production
+  dashboard: false # [DEBUGGING] Traefik dashboard, disable in production
+
+entryPoints:
+  web:
+    address: ":80"
+providers:
+  docker:
+    exposedbydefault: false # <== Don't expose every container to traefik, only expose enabled ones  

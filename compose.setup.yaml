@@ -1,0 +1,44 @@
+services:
+  devguard-setup:
+    # One-time init container: generates the encryption key and downloads
+    # the Kratos config + DB init script into named volumes.
+    # Runs on every `docker compose up` but skips files that already exist.
+    image: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+    environment:
+      POSTGRES_KRATOS_PASSWORD: ${POSTGRES_KRATOS_PASSWORD}
+    volumes:
+      - encryption-key:/keys
+      - kratos-config:/kratos
+      - initdb:/initdb
+      - ./dev/container-setup.sh:/container-setup.sh:ro
+    command: ["sh", "/container-setup.sh"]
+    networks:
+      - devguard-local
+
+  postgresql:
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - initdb:/docker-entrypoint-initdb.d:ro
+    # During setup we only want Postgres to run its init scripts (init.sql)
+    # once against the fresh data volume, then exit — so `compose up` returns
+    # on its own instead of leaving a server running in the foreground.
+    healthcheck:
+      disable: true
+    entrypoint:
+      - bash
+      - -c
+      - |
+        docker-entrypoint.sh postgres &
+        pid=$$!
+        # The temporary init server only listens on the unix socket, so a
+        # successful TCP check means init finished and the real server is up.
+        until pg_isready -h 127.0.0.1 -q; do sleep 1; done
+        echo 'Postgres initialized — stopping setup instance.'
+        kill -INT "$$pid"
+        wait "$$pid"
+
+  #kratos:
+  #  command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+
+volumes:
+  initdb:
