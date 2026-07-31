@@ -2,27 +2,37 @@
 
 > **DISCLAIMER: Work in Progress. This repo will change.**
 
-## Initial Setup:
+## Deployment Options
 
-1. Configure the `.env` file. The easiest way is the interactive setup, which
-   copies `.env.example`, generates all secrets, and fills in the domain /
-   protocol for the mode you pick (localhost, OrbStack, or Traefik).
+- **Localhost**
+  - Best for simple initial DevGuard test on localhost.
+- **OrbStack**
+  - Also great for localhost testing if you are using OrbStack. Advantage over Localhost deployment is that you get SSL support out of the box through [OrbStacks zero-config SSL certificates](https://docs.orbstack.dev/docker/domains#https).
+- **Traefik**
+  - In case you want to make DevGuard accessible from other computers this is the recommended way.
 
-   ```bash
-   # Run configuration script
-   docker compose -f compose.configure.yaml run --rm configure
-   ```
+## Setup
 
-   Prefer to do it by hand? Copy [`.env.example`](.env.example) to `.env` and edit it
+### Guided / Automatic
 
-1. Launch Initial Setup
+The easiest way to get started is the interactive setup which let's you
+pick a deployment option (Localhost, OrbStack, or Traefik).
 
-   ```bash
-   # Generates the encryption key + configs and initializes the database.
-   docker compose -f compose.yaml -f compose.setup.yaml up devguard-setup postgresql
-   ```
+```bash
+# Run configuration script
+docker compose -f compose.configure.yaml run --rm configure
+```
 
-# Launch DevGuard
+### Manual
+
+Copy [`.env.example`](.env.example) to `.env` and edit it
+
+```bash
+# Generates the encryption key + configs and initializes the database.
+docker compose -f compose.yaml -f compose.setup.yaml up devguard-setup postgresql
+```
+
+## Launch DevGuard
 
 ```bash
 # Launch with Localhost / HTTP
