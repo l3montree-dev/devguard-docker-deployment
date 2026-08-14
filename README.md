@@ -22,21 +22,26 @@ git clone git@github.com:l3montree-dev/devguard-docker-deployment.git
 ### Guided / Automatic
 
 The easiest way to get started is the interactive setup which let's you
-pick a deployment option (Localhost, OrbStack, or Traefik).
+pick a deployment option (Localhost, OrbStack, or Traefik). It writes `.env`
+and generates the encryption key, the Kratos config and the database init
+script. Re-running it keeps existing secrets and files.
 
 ```bash
-# Run configuration script
+# 1. Run configuration script
 docker compose -f compose.configure.yaml run --rm configure
+
+# 2. Initialize the database
+docker compose -f compose.yaml -f compose.setup.yaml up postgresql
+
+# 3. Import the vulnerability database (one time only, takes a few minutes)
+docker compose -f compose.yaml --profile vulndb-import run --rm devguard-vulndb-import
 ```
 
 ### Manual
 
-Copy [`.env.example`](.env.example) to `.env` and edit it
-
-```bash
-# Generates the encryption key + configs and initializes the database.
-docker compose -f compose.yaml -f compose.setup.yaml up devguard-setup postgresql
-```
+Copy [`.env.example`](.env.example) to `.env` and edit it, then run the three
+commands above — the configure script keeps every value that is no longer set
+to `change-me`, so it only fills in the gaps and the generated files.
 
 ## Launch DevGuard
 
@@ -51,7 +56,15 @@ docker compose -f compose.yaml -f compose.traefik.yaml up -d --remove-orphans
 docker compose -f compose.yaml -f compose.orbstack.yaml up -d --remove-orphans
 ```
 
+## What to Backup
+
+You should perform regular dumps (e.g. using pgdump) of the `devguard` and `kratos` databases. Ensure also
+to store a copy of the app-side encryption key generated during setup.
+
 ## Reset
+
+> [!CAUTION]
+> This will remove all volumes and the corresponding data!
 
 ```bash
 docker compose down -v --remove-orphans # after this you need to run the initial setup again

@@ -1,20 +1,9 @@
+# One-time database initialization. Requires the configure step to have run
+# first (it writes init.sql into the `initdb` volume):
+#
+#   docker compose -f compose.yaml -f compose.setup.yaml up postgresql
+#
 services:
-  devguard-setup:
-    # One-time init container: generates the encryption key and downloads
-    # the Kratos config + DB init script into named volumes.
-    # Runs on every `docker compose up` but skips files that already exist.
-    image: alpine:3.21@sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
-    environment:
-      POSTGRES_KRATOS_PASSWORD: ${POSTGRES_KRATOS_PASSWORD}
-    volumes:
-      - encryption-key:/keys
-      - kratos-config:/kratos
-      - initdb:/initdb
-      - ./dev/container-setup.sh:/container-setup.sh:ro
-    command: ["sh", "/container-setup.sh"]
-    networks:
-      - devguard-local
-
   postgresql:
     volumes:
       - postgres:/var/lib/postgresql/data

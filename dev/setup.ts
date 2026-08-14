@@ -6,6 +6,11 @@
 //   * generates the four secrets at the top of the file
 //   * asks how you want to reach DevGuard (localhost / OrbStack / Traefik)
 //     and fills in the domain, protocol and passkey RP-ID accordingly
+//   * generates the app encryption key and downloads the Kratos config +
+//     the database init script into the mounted volumes
+//
+// Safe to run repeatedly: existing secrets and files are kept, only the
+// deployment mode is re-applied.
 //
 // Run it from the devguard-docker directory (identical on every OS); the
 // container mounts the repo root as the working dir, so .env is read/written
@@ -18,6 +23,12 @@ import { randomBytes } from "node:crypto";
 
 const EXAMPLE_FILE = ".env.example";
 const ENV_FILE = ".env";
+
+// Named volumes mounted by compose.configure.yaml — shared with the runtime
+// services, which read them (read-only) from compose.yaml / compose.setup.yaml.
+const KEYS_DIR = "/keys";
+const KRATOS_DIR = "/kratos";
+const INITDB_DIR = "/initdb";
 
 // --- pretty output -----------------------------------------------------------
 const tty = Boolean(process.stdout.isTTY);
@@ -45,6 +56,14 @@ function ask(question: string, def?: string): string {
 // --- prerequisites -----------------------------------------------------------
 if (!existsSync(EXAMPLE_FILE)) {
   die(`${EXAMPLE_FILE} not found — is the repo mounted at /app?`);
+}
+for (const dir of [KEYS_DIR, KRATOS_DIR, INITDB_DIR]) {
+  if (!existsSync(dir)) {
+    die(
+      `${dir} is not mounted. Start this script with:\n` +
+        `  docker compose -f compose.configure.yaml run --rm configure`,
+    );
+  }
 }
 
 // --- start from an existing .env, or seed one from .env.example --------------
@@ -157,14 +176,71 @@ switch (mode) {
 writeFileSync(ENV_FILE, env);
 step(`Configured for ${bold(modeName!)} mode`);
 
+// --- encryption key, Kratos config and DB init script ------------------------
+// From here on nothing is interactive: the files below live in the named
+// volumes and are only created when missing, so re-runs never clobber a
+// running deployment.
+console.log();
+step("Generating keys and configs");
+
+const KEY_FILE = `${KEYS_DIR}/app_side_encryption.key`;
+if (existsSync(KEY_FILE)) {
+  console.log(dim("  kept existing: app_side_encryption.key"));
+} else {
+  // 32 random bytes as 64 hex chars and no trailing newline — the API reads
+  // the file verbatim.
+  writeFileSync(KEY_FILE, randomBytes(32).toString("hex"));
+  console.log(dim("  generated: app_side_encryption.key"));
+}
+
+const BASE = "https://raw.githubusercontent.com/l3montree-dev/devguard/refs/heads/main";
+const DOWNLOADS: [url: string, path: string][] = [
+  [`${BASE}/.kratos/kratos.example.yml`, `${KRATOS_DIR}/kratos.yml`],
+  [`${BASE}/.kratos/identity.schema.json`, `${KRATOS_DIR}/identity.schema.json`],
+  [`${BASE}/initdb.sql`, `${INITDB_DIR}/init.sql`],
+];
+for (const [url, path] of DOWNLOADS) {
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  if (existsSync(path)) {
+    console.log(dim(`  kept existing: ${name}`));
+    continue;
+  }
+  const res = await fetch(url).catch((e: Error) => die(`could not download ${url} — ${e.message}`));
+  if (!res.ok) die(`could not download ${url} — HTTP ${res.status}`);
+  writeFileSync(path, new Uint8Array(await res.arrayBuffer()));
+  console.log(dim(`  downloaded: ${name}`));
+}
+
+// init.sql creates the `kratos` DB user with a placeholder password; it has to
+// match POSTGRES_KRATOS_PASSWORD, which .kratos.env feeds into Kratos' DSN.
+const INIT_SQL = `${INITDB_DIR}/init.sql`;
+const INIT_SQL_PLACEHOLDER = "change-me-definitely-when-not-testing";
+const kratosPassword = getEnv("POSTGRES_KRATOS_PASSWORD");
+if (!kratosPassword) die("POSTGRES_KRATOS_PASSWORD is empty in .env");
+const initSql = readFileSync(INIT_SQL, "utf8");
+if (initSql.includes(INIT_SQL_PLACEHOLDER)) {
+  writeFileSync(INIT_SQL, initSql.replaceAll(INIT_SQL_PLACEHOLDER, kratosPassword!));
+  console.log(dim("  applied POSTGRES_KRATOS_PASSWORD to init.sql"));
+} else if (!initSql.includes(kratosPassword!)) {
+  console.log();
+  warn("init.sql already holds a different kratos DB password than .env.");
+  warn("If Kratos cannot reach the database, reset the deployment with");
+  warn("`docker compose down -v --remove-orphans` and run this setup again.");
+}
+
 // --- next steps --------------------------------------------------------------
 console.log();
 console.log(`${green("Done.")} Next steps:`);
 console.log();
-console.log(dim("  # 1. one-time init (encryption key, configs, database)"));
-console.log("  docker compose -f compose.yaml -f compose.setup.yaml up devguard-setup postgresql");
+console.log(dim("  # 1. initialize the database (runs init.sql once, then exits)"));
+console.log("  docker compose -f compose.yaml -f compose.setup.yaml up postgresql");
 console.log();
-console.log(dim("  # 2. launch DevGuard"));
+console.log(dim("  # 2. import the vulnerability database (CVEs, exploits, EPSS, ...)."));
+console.log(dim("  #    One time only and takes a few minutes; DevGuard keeps the"));
+console.log(dim("  #    data in sync on its own afterwards."));
+console.log("  docker compose -f compose.yaml --profile vulndb-import run --rm devguard-vulndb-import");
+console.log();
+console.log(dim("  # 3. launch DevGuard"));
 console.log(`  docker compose -f compose.yaml -f ${composeFile!} up -d --remove-orphans`);
 
 if (mode === "3") {
