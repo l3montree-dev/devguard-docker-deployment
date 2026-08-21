@@ -7,8 +7,16 @@ api:
   dashboard: false # [DEBUGGING] Traefik dashboard, disable in production
 
 entryPoints:
-  web:
-    address: ":80"
+  websecure:
+    address: ":443"
+    http:
+      tls: {} # terminate TLS with the default certificate from .traefik/dynamic/tls.yml
+
 providers:
   docker:
-    exposedbydefault: false # <== Don't expose every container to traefik, only expose enabled ones  
+    exposedbydefault: false # <== Don't expose every container to traefik, only expose enabled ones
+  file:
+    # TLS stores/certificates are *dynamic* config and are silently ignored if
+    # placed in this (static) file — they have to come from a provider.
+    directory: /etc/traefik/dynamic
+    watch: true
