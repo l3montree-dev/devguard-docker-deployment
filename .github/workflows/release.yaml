@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Determine tag and minor version
+        id: tag
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "minor=$(echo "${TAG#v}" | cut -d. -f1-2)" >> "$GITHUB_OUTPUT"
+
+      - name: Extract changelog section
+        id: changelog
+        run: |
+          awk -v tag="${{ steps.tag.outputs.tag }}" '
+            $0 ~ "^## \\[" tag "\\]" { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+
+          if [ ! -s release-notes.md ]; then
+            echo "_No changelog entry found for ${{ steps.tag.outputs.tag }} — see [CHANGELOG.md](CHANGELOG.md)._" > release-notes.md
+          fi
+
+      - name: Package deployment bundle
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz --prefix="devguard-docker-deployment-${{ steps.tag.outputs.tag }}/" \
+            -o "dist/devguard-docker-deployment-${{ steps.tag.outputs.tag }}.tar.gz" HEAD
+          cd dist
+          sha256sum *.tar.gz > checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "DevGuard Docker Deployment ${{ steps.tag.outputs.tag }}"
+          draft: false
+          prerelease: ${{ contains(steps.tag.outputs.tag, '-rc') || contains(steps.tag.outputs.tag, '-alpha') || contains(steps.tag.outputs.tag, '-beta') }}
+          body_path: release-notes.md
+          files: |
+            dist/*.tar.gz
+            dist/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
