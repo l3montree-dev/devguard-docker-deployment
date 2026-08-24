@@ -1,0 +1,10 @@
+# Dynamic configuration — loaded by the file provider (see ../traefik.yml).
+# Serves one certificate for every host that has no better match.
+# Put the PEM files in ../../certs/ on the host; they are mounted read-only
+# into the container at /etc/traefik/certs/.
+tls:
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /etc/traefik/certs/domain.cert
+        keyFile: /etc/traefik/certs/domain.key

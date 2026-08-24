@@ -2,14 +2,13 @@ services:
   traefik:
     image: traefik:${TRAEFIK_TAG}
     ports:
-      - "80:80"
+      - "443:443"
     #  - "8080:8080" # [DEBUGGING] Traefik dashboard, disable in production
     volumes:
       - ./.traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./.traefik/dynamic/:/etc/traefik/dynamic/:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=devguard-local"
+      - ./certs/:/etc/traefik/certs/:ro
     networks:
       - devguard-local
     
@@ -17,6 +16,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=devguard-local"
+      - "traefik.http.routers.devguard-api.entrypoints=websecure"
       - "traefik.http.services.devguard-api.loadbalancer.server.port=8080"
       - "traefik.http.routers.devguard-api.rule=Host(`${DEVGUARD_API_DOMAIN}`)"
 
@@ -24,5 +24,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=devguard-local"
+      - "traefik.http.routers.devguard-web.entrypoints=websecure"
       - "traefik.http.services.devguard-web.loadbalancer.server.port=3000"
       - "traefik.http.routers.devguard-web.rule=Host(`${DEVGUARD_WEB_DOMAIN}`)"

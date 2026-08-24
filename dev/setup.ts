@@ -61,7 +61,7 @@ for (const dir of [KEYS_DIR, KRATOS_DIR, INITDB_DIR]) {
   if (!existsSync(dir)) {
     die(
       `${dir} is not mounted. Start this script with:\n` +
-        `  docker compose -f compose.configure.yaml run --rm configure`,
+      `  docker compose -f compose.configure.yaml run --rm configure`,
     );
   }
 }
@@ -149,7 +149,7 @@ switch (mode) {
   case "2":
     modeName = "OrbStack";
     composeFile = "compose.orbstack.yaml";
-    baseDomain = ask("Base domain", "devguard.local");
+    baseDomain = ask("Base domain (change only if necessary)", "devguard.local");
     setEnv("DEVGUARD_WEB_DOMAIN", baseDomain);
     setEnv("DEVGUARD_API_DOMAIN", `api.${baseDomain}`);
     setEnv("DEVGUARD_PROTOCOL", "https");
@@ -235,16 +235,15 @@ console.log();
 console.log(dim("  # 1. initialize the database (runs init.sql once, then exits)"));
 console.log("  docker compose -f compose.yaml -f compose.setup.yaml up postgresql");
 console.log();
-console.log(dim("  # 2. import the vulnerability database (CVEs, exploits, EPSS, ...)."));
-console.log(dim("  #    One time only and takes a few minutes; DevGuard keeps the"));
-console.log(dim("  #    data in sync on its own afterwards."));
-console.log("  docker compose -f compose.yaml --profile vulndb-import run --rm devguard-vulndb-import");
-console.log();
-console.log(dim("  # 3. launch DevGuard"));
+console.log(dim("  # 2. launch DevGuard"));
 console.log(`  docker compose -f compose.yaml -f ${composeFile!} up -d --remove-orphans`);
 
 if (mode === "3") {
   console.log();
-  console.log(dim("  # Traefik: point the domain at your host, e.g. in /etc/hosts:"));
+  console.log(dim("  # Traefik: If it's not a public domain, point the domain at your host, e.g. in /etc/hosts:"));
   console.log(`  127.0.0.1  ${baseDomain} api.${baseDomain}`);
 }
+
+console.log();
+console.log(dim("  # 3. open the web UI in your browser"));
+console.log(`  ${baseDomain}`);
