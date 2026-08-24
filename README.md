@@ -1,6 +1,4 @@
-# DevGuard Docker Deployment - WiP
-
-> **DISCLAIMER: Work in Progress. This repo will change.**
+# DevGuard Docker Deployment
 
 ## Deployment Options
 
