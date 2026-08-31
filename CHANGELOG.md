@@ -6,6 +6,13 @@ This repository follows DevGuard's shared [versioning policy](VERSIONING.md): it
 
 For API and web frontend changes see the [main DevGuard CHANGELOG](https://github.com/l3montree-dev/devguard/blob/main/CHANGELOG.md).
 
+## [v1.13.1] - 2026-08-31
+
+### Changed
+
+- `kratos` and `kratos-migrate` now use l3montree's own Kratos image (`ghcr.io/l3montree-dev/devguard/kratos`) instead of the upstream `oryd/kratos` image
+- Replaced the `ORY_KRATOS_TAG` environment variable with `KRATOS_TAG` to select the new image's tag
+
 ## [v1.13.0] - 2026-08-24
 
 First release of this dedicated deployment repository, replacing the `docker-compose.yaml` / `docker-compose-try-it` setup previously maintained inside the main [devguard](https://github.com/l3montree-dev/devguard) repository. Versioned as v1.13.0 to align with the DevGuard v1.13.0 minor release per the [versioning policy](VERSIONING.md).
