@@ -27,7 +27,7 @@ services:
       - devguard-local
 
   kratos-migrate:
-    image: oryd/kratos:${ORY_KRATOS_TAG}
+    image: ghcr.io/l3montree-dev/devguard/kratos:${KRATOS_TAG}
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -45,7 +45,7 @@ services:
       - devguard-local
 
   kratos:
-    image: oryd/kratos:${ORY_KRATOS_TAG}
+    image: ghcr.io/l3montree-dev/devguard/kratos:${KRATOS_TAG}
     read_only: true
     security_opt:
       - no-new-privileges:true
