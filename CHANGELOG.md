@@ -6,6 +6,14 @@ This repository follows DevGuard's shared [versioning policy](VERSIONING.md): it
 
 For API and web frontend changes see the [main DevGuard CHANGELOG](https://github.com/l3montree-dev/devguard/blob/main/CHANGELOG.md).
 
+## [v1.14.1] — 2026-09-19
+
+### Changed
+
+- Bumped default DevGuard image versions: `devguard` to `v1.14.2`, `devguard-web` to `v1.14.1`
+
+---
+
 ## [v1.14.0] — 2026-09-17
 
 ### Changed
