@@ -29,6 +29,13 @@ script. Re-running it keeps existing secrets and files.
 docker compose -f compose.configure.yaml run --rm configure
 ```
 
+**Note:** You might have to specify a `BUN_TAG` so docker can retrieve the according image
+
+```bash
+# Run configuration script
+BUN_TAG=<BUN-TAG> docker compose -f compose.configure.yaml run --rm configure
+```
+
 ### Manual
 
 See [Manual Setup](#manual-setup) Instructions in the "Details" Section at the end of this file.

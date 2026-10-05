@@ -68,6 +68,47 @@ services:
     networks:
       - devguard-local
 
+  river-migrate:
+    image: ghcr.io/l3montree-dev/devguard/postgresql:${POSTGRESQL_TAG}
+    shm_size: 1g
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      RIVER_POSTGRES_PASSWORD: ${RIVER_POSTGRES_PASSWORD}
+      RIVER_POSTGRES_USER: ${RIVER_POSTGRES_USER}
+      RIVER_POSTGRES_DB: ${RIVER_POSTGRES_DB}
+      PGHOST: ${POSTGRES_HOST}
+      PGPORT: ${POSTGRES_PORT}
+      PGUSER: ${POSTGRES_DEVGUARD_USER}
+      PGPASSWORD: ${POSTGRES_DEVGUARD_PASSWORD}
+      PGDATABASE: ${POSTGRES_DEVGUARD_DB}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    tmpfs: 
+      - /run/postgresql:rw,uid=999,gid=999
+    networks:
+      - devguard-local
+    command:
+      - bash
+      - -c
+      - |
+        psql -v ON_ERROR_STOP=1 \
+          -v river_user="${RIVER_POSTGRES_USER}" \
+          -v river_db="${RIVER_POSTGRES_DB}" \
+          -v river_password="${RIVER_POSTGRES_PASSWORD}" <<'SQL'
+        SELECT format('CREATE USER %I PASSWORD %L', :'river_user', :'river_password')
+        WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = :'river_user')
+        \gexec
+
+        SELECT format('CREATE DATABASE %I OWNER %I', :'river_db', :'river_user')
+        WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'river_db')
+        \gexec
+
+        \c :"river_db"
+        GRANT USAGE, CREATE ON SCHEMA public TO :"river_user";
+        SQL
+
   devguard-migrate:
     image: ghcr.io/l3montree-dev/devguard:${DEVGUARD_API_TAG}
     read_only: true
@@ -111,6 +152,8 @@ services:
       kratos:
         condition: service_started
       devguard-migrate:
+        condition: service_completed_successfully
+      river-migrate:
         condition: service_completed_successfully
     volumes:
       - encryption-key:/keys:ro

@@ -3,7 +3,7 @@
 // Interactive setup for the DevGuard Docker deployment.
 //
 //   * copies .env.example -> .env
-//   * generates the four secrets at the top of the file
+//   * generates the five secrets at the top of the file
 //   * asks how you want to reach DevGuard (localhost / OrbStack / Traefik)
 //     and fills in the domain, protocol and passkey RP-ID accordingly
 //   * generates the app encryption key and downloads the Kratos config +
@@ -48,7 +48,9 @@ const die = (s: string): never => {
 
 // --- tiny prompt helpers -----------------------------------------------------
 function ask(question: string, def?: string): string {
-  const answer = prompt(question + (def !== undefined ? ` ${dim(`[${def}]`)}` : ""));
+  const answer = prompt(
+    question + (def !== undefined ? ` ${dim(`[${def}]`)}` : ""),
+  );
   const value = (answer ?? "").trim();
   return value === "" && def !== undefined ? def : value;
 }
@@ -61,7 +63,7 @@ for (const dir of [KEYS_DIR, KRATOS_DIR, INITDB_DIR]) {
   if (!existsSync(dir)) {
     die(
       `${dir} is not mounted. Start this script with:\n` +
-      `  docker compose -f compose.configure.yaml run --rm configure`,
+        `  docker compose -f compose.configure.yaml run --rm configure`,
     );
   }
 }
@@ -106,6 +108,7 @@ const SECRETS = [
   "POSTGRES_KRATOS_PASSWORD",
   "KRATOS_COOKIE_SECRET",
   "KRATOS_CIPHER_SECRET",
+  "RIVER_POSTGRES_PASSWORD",
 ];
 step("Generating secrets");
 const generated: string[] = [];
@@ -124,13 +127,20 @@ if (kept.length) console.log(dim(`  kept existing: ${kept.join(", ")}`));
 // --- pick a deployment mode --------------------------------------------------
 console.log();
 console.log(bold("How do you want to reach DevGuard?"));
-console.log(`  ${bold("1)")} localhost   ${dim("- HTTP on localhost:3000 / :8080 (compose.localhost.yaml)")}`);
-console.log(`  ${bold("2)")} OrbStack    ${dim("- HTTPS on a *.local domain, auto TLS (compose.orbstack.yaml)")}`);
-console.log(`  ${bold("3)")} Traefik     ${dim("- reverse proxy on a custom domain (compose.traefik.yaml)")}`);
+console.log(
+  `  ${bold("1)")} localhost   ${dim("- HTTP on localhost:3000 / :8080 (compose.localhost.yaml)")}`,
+);
+console.log(
+  `  ${bold("2)")} OrbStack    ${dim("- HTTPS on a *.local domain, auto TLS (compose.orbstack.yaml)")}`,
+);
+console.log(
+  `  ${bold("3)")} Traefik     ${dim("- reverse proxy on a custom domain (compose.traefik.yaml)")}`,
+);
 const mode = ask("Select [1-3]", "1");
 
 /** Derive the passkey RP-ID from a web domain: strip scheme and :port. */
-const rpIdFrom = (domain: string) => domain.replace(/^https?:\/\//, "").replace(/:\d+$/, "");
+const rpIdFrom = (domain: string) =>
+  domain.replace(/^https?:\/\//, "").replace(/:\d+$/, "");
 
 let modeName: string;
 let composeFile: string;
@@ -149,7 +159,10 @@ switch (mode) {
   case "2":
     modeName = "OrbStack";
     composeFile = "compose.orbstack.yaml";
-    baseDomain = ask("Base domain (change only if necessary)", "devguard.local");
+    baseDomain = ask(
+      "Base domain (change only if necessary)",
+      "devguard.local",
+    );
     setEnv("DEVGUARD_WEB_DOMAIN", baseDomain);
     setEnv("DEVGUARD_API_DOMAIN", `api.${baseDomain}`);
     setEnv("DEVGUARD_PROTOCOL", "https");
@@ -164,8 +177,12 @@ switch (mode) {
     setEnv("DEVGUARD_API_DOMAIN", `api.${baseDomain}`);
     setEnv("DEVGUARD_PROTOCOL", "http");
     setEnv("KRATOS_PASSKEY_RP_ID", rpIdFrom(baseDomain));
-    warn("Traefik (as shipped) serves plain HTTP on :80. Passkeys need a secure");
-    warn("context, so they only work on 'localhost' or over HTTPS — add TLS to");
+    warn(
+      "Traefik (as shipped) serves plain HTTP on :80. Passkeys need a secure",
+    );
+    warn(
+      "context, so they only work on 'localhost' or over HTTPS — add TLS to",
+    );
     warn(".traefik/traefik.yml and set DEVGUARD_PROTOCOL=https for real use.");
     break;
 
@@ -193,10 +210,14 @@ if (existsSync(KEY_FILE)) {
   console.log(dim("  generated: app_side_encryption.key"));
 }
 
-const BASE = "https://raw.githubusercontent.com/l3montree-dev/devguard/refs/heads/main";
+const BASE =
+  "https://raw.githubusercontent.com/l3montree-dev/devguard/refs/heads/main";
 const DOWNLOADS: [url: string, path: string][] = [
   [`${BASE}/.kratos/kratos.example.yml`, `${KRATOS_DIR}/kratos.yml`],
-  [`${BASE}/.kratos/identity.schema.json`, `${KRATOS_DIR}/identity.schema.json`],
+  [
+    `${BASE}/.kratos/identity.schema.json`,
+    `${KRATOS_DIR}/identity.schema.json`,
+  ],
   [`${BASE}/initdb.sql`, `${INITDB_DIR}/init.sql`],
 ];
 for (const [url, path] of DOWNLOADS) {
@@ -205,7 +226,9 @@ for (const [url, path] of DOWNLOADS) {
     console.log(dim(`  kept existing: ${name}`));
     continue;
   }
-  const res = await fetch(url).catch((e: Error) => die(`could not download ${url} — ${e.message}`));
+  const res = await fetch(url).catch((e: Error) =>
+    die(`could not download ${url} — ${e.message}`),
+  );
   if (!res.ok) die(`could not download ${url} — HTTP ${res.status}`);
   writeFileSync(path, new Uint8Array(await res.arrayBuffer()));
   console.log(dim(`  downloaded: ${name}`));
@@ -214,33 +237,71 @@ for (const [url, path] of DOWNLOADS) {
 // init.sql creates the `kratos` DB user with a placeholder password; it has to
 // match POSTGRES_KRATOS_PASSWORD, which .kratos.env feeds into Kratos' DSN.
 const INIT_SQL = `${INITDB_DIR}/init.sql`;
-const INIT_SQL_PLACEHOLDER = "change-me-definitely-when-not-testing";
+const INIT_SQL_PLACEHOLDER_BASE = "change-me-definitely-when-not-testing";
+const INIT_SQL_PLACEHOLDER_KRATOS = INIT_SQL_PLACEHOLDER_BASE + "-kratos";
+const INIT_SQL_PLACEHOLDER_RIVER = INIT_SQL_PLACEHOLDER_BASE + "-river";
 const kratosPassword = getEnv("POSTGRES_KRATOS_PASSWORD");
 if (!kratosPassword) die("POSTGRES_KRATOS_PASSWORD is empty in .env");
+const riverPassword = getEnv("RIVER_POSTGRES_PASSWORD");
+if (!riverPassword) die("RIVER_POSTGRES_PASSWORD is empty in .env");
+
+const placeholderMap = {
+  [INIT_SQL_PLACEHOLDER_KRATOS]: {
+    value: kratosPassword,
+    name: "INIT_SQL_PLACEHOLDER_KRATOS",
+  },
+  [INIT_SQL_PLACEHOLDER_RIVER]: {
+    value: riverPassword,
+    name: "INIT_SQL_PLACEHOLDER_RIVER",
+  },
+};
+
 const initSql = readFileSync(INIT_SQL, "utf8");
-if (initSql.includes(INIT_SQL_PLACEHOLDER)) {
-  writeFileSync(INIT_SQL, initSql.replaceAll(INIT_SQL_PLACEHOLDER, kratosPassword!));
-  console.log(dim("  applied POSTGRES_KRATOS_PASSWORD to init.sql"));
-} else if (!initSql.includes(kratosPassword!)) {
-  console.log();
-  warn("init.sql already holds a different kratos DB password than .env.");
-  warn("If Kratos cannot reach the database, reset the deployment with");
-  warn("`docker compose down -v --remove-orphans` and run this setup again.");
-}
+let transformedInitSql = initSql;
+
+Object.keys(placeholderMap).map((key) => {
+  if (transformedInitSql.includes(key)) {
+    transformedInitSql = transformedInitSql.replaceAll(key, placeholderMap[key].value!);
+    console.log(dim(`  applied ${placeholderMap[key].name} to init.sql`));
+  } else if (!transformedInitSql.includes(placeholderMap[key].value!)) {
+    console.log();
+    warn(
+      `init.sql already holds a different value for ${placeholderMap[key].name} than .env.`,
+    );
+    if (placeholderMap[key].name == "INIT_SQL_PLACEHOLDER_KRATOS") {
+      warn("If Kratos cannot reach the database, reset the deployment with");
+      warn(
+        "`docker compose down -v --remove-orphans` and run this setup again.",
+      );
+    }
+  }
+});
+
+writeFileSync(INIT_SQL, transformedInitSql);
 
 // --- next steps --------------------------------------------------------------
 console.log();
 console.log(`${green("Done.")} Next steps:`);
 console.log();
-console.log(dim("  # 1. initialize the database (runs init.sql once, then exits)"));
-console.log("  docker compose -f compose.yaml -f compose.setup.yaml up postgresql");
+console.log(
+  dim("  # 1. initialize the database (runs init.sql once, then exits)"),
+);
+console.log(
+  "  docker compose -f compose.yaml -f compose.setup.yaml up postgresql",
+);
 console.log();
 console.log(dim("  # 2. launch DevGuard"));
-console.log(`  docker compose -f compose.yaml -f ${composeFile!} up -d --remove-orphans`);
+console.log(
+  `  docker compose -f compose.yaml -f ${composeFile!} up -d --remove-orphans`,
+);
 
 if (mode === "3") {
   console.log();
-  console.log(dim("  # Traefik: If it's not a public domain, point the domain at your host, e.g. in /etc/hosts:"));
+  console.log(
+    dim(
+      "  # Traefik: If it's not a public domain, point the domain at your host, e.g. in /etc/hosts:",
+    ),
+  );
   console.log(`  127.0.0.1  ${baseDomain} api.${baseDomain}`);
 }
 
