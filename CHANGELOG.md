@@ -6,6 +6,26 @@ This repository follows DevGuard's shared [versioning policy](VERSIONING.md): it
 
 For API and web frontend changes see the [main DevGuard CHANGELOG](https://github.com/l3montree-dev/devguard/blob/main/CHANGELOG.md).
 
+## [v1.17.0] — 2026-10-26
+
+### Added
+
+- SLSA build provenance signing: the guided setup (`dev/setup.ts`) now generates an EC (prime256v1) signing key at `slsa-private-key.pem` next to the app-side encryption key. Existing keys are kept on re-runs. Keep the key stable — verifiers trust signatures made with its public key.
+- New SLSA settings in `.env.example` and passed to the `devguard` service in `compose.yaml`:
+  - `SLSA_PRIVATE_KEY_PATH` (defaults to `/keys/slsa-private-key.pem`)
+  - `SLSA_OIDC_TRUSTED_ISSUERS` (optional) — comma-separated OIDC issuers whose CI workload identity tokens are accepted. Empty accepts every https issuer.
+  - `SLSA_OIDC_AUDIENCE` (optional) — defaults to `DEVGUARD_API_URL` and must match `devguard_api_url` of the CI components.
+  - `SLSA_REKOR_URL` (optional) — Rekor transparency log the signed provenance is uploaded to. Empty disables the upload.
+- `riverui` service: dashboard for the API's background job queue. It can cancel, retry and delete jobs, so it is not exposed by default; the commented-out port mapping binds to `127.0.0.1:4040` only (e.g. for access through an SSH tunnel).
+- `API_URL` is now passed to the `devguard` service (set to `DEVGUARD_API_URL`).
+
+### Upgrade notes
+
+- Existing deployments: re-run the guided setup to generate the SLSA signing key, otherwise the API cannot find `SLSA_PRIVATE_KEY_PATH`. Copy the new SLSA variables from `.env.example` into your `.env`.
+- `riverui` builds its database URL from `POSTGRES_DEVGUARD_PASSWORD`, so the password must not contain URL-reserved characters.
+
+---
+
 ## [v1.16.1] — 2026-10-11
 
 ### Changed
