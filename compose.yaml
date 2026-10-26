@@ -125,7 +125,12 @@ services:
       LOG_LEVEL: ${DEVGUARD_LOG_LEVEL}
       APP_SIDE_ENCRYPTION_KEY_PATH: ${APP_SIDE_ENCRYPTION_KEY_PATH}
       INSTANCE_DOMAIN: ${DEVGUARD_API_URL}
+      API_URL: ${DEVGUARD_API_URL}
       FRONTEND_URL: ${DEVGUARD_FRONTEND_URL}
+      SLSA_PRIVATE_KEY_PATH: ${SLSA_PRIVATE_KEY_PATH}
+      SLSA_OIDC_TRUSTED_ISSUERS: ${SLSA_OIDC_TRUSTED_ISSUERS:-}
+      SLSA_OIDC_AUDIENCE: ${SLSA_OIDC_AUDIENCE:-}
+      SLSA_REKOR_URL: ${SLSA_REKOR_URL:-}
     networks:
       - devguard-local
 
@@ -145,6 +150,34 @@ services:
       DEVGUARD_API_URL: http://devguard-api:8080
       ORY_SDK_URL: ${ORY_SDK_URL}
       ORY_SDK_PUBLIC_URL: ${DEVGUARD_FRONTEND_URL}
+    networks:
+      - devguard-local
+
+  # dashboard for the background job queue of the api - it can cancel, retry and delete jobs, therefore it is not exposed
+  riverui:
+    image: ghcr.io/riverqueue/riverui:0.21.0@sha256:3f59206a0f152ae50a45bb49e3646de2126c878f9daa4781f42ba311f141599d
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "65534"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      devguard-migrate:
+        condition: service_completed_successfully
+    environment:
+      # the password is part of the url - it must not contain url reserved characters
+      DATABASE_URL: postgres://${POSTGRES_DEVGUARD_USER}:${POSTGRES_DEVGUARD_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DEVGUARD_DB}?sslmode=disable
+      PATH_PREFIX: /
+    healthcheck:
+      test: ["CMD", "/bin/riverui", "-healthcheck=complete"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    #ports:
+    #  - "127.0.0.1:4040:8080" # only expose it on localhost, e.g. to reach it through an ssh tunnel
     networks:
       - devguard-local
 

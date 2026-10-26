@@ -6,8 +6,8 @@
 //   * generates the four secrets at the top of the file
 //   * asks how you want to reach DevGuard (localhost / OrbStack / Traefik)
 //     and fills in the domain, protocol and passkey RP-ID accordingly
-//   * generates the app encryption key and downloads the Kratos config +
-//     the database init script into the mounted volumes
+//   * generates the app encryption key and the SLSA signing key and downloads
+//     the Kratos config + the database init script into the mounted volumes
 //
 // Safe to run repeatedly: existing secrets and files are kept, only the
 // deployment mode is re-applied.
@@ -19,7 +19,7 @@
 //   docker compose -f compose.configure.yaml run --rm configure
 //
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
-import { randomBytes } from "node:crypto";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
 
 const EXAMPLE_FILE = ".env.example";
 const ENV_FILE = ".env";
@@ -191,6 +191,17 @@ if (existsSync(KEY_FILE)) {
   // the file verbatim.
   writeFileSync(KEY_FILE, randomBytes(32).toString("hex"));
   console.log(dim("  generated: app_side_encryption.key"));
+}
+
+const SLSA_KEY_FILE = `${KEYS_DIR}/slsa-private-key.pem`;
+if (existsSync(SLSA_KEY_FILE)) {
+  console.log(dim("  kept existing: slsa-private-key.pem"));
+} else {
+  // EC (prime256v1) key the API signs in-toto layouts and SLSA build provenance with.
+  // Keep it stable - verifiers trust signatures made with its public key.
+  const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  writeFileSync(SLSA_KEY_FILE, privateKey.export({ type: "sec1", format: "pem" }));
+  console.log(dim("  generated: slsa-private-key.pem"));
 }
 
 const BASE = "https://raw.githubusercontent.com/l3montree-dev/devguard/refs/heads/main";
