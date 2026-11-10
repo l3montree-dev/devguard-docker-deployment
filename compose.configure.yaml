@@ -8,7 +8,7 @@ name: devguard
 
 services:
   configure:
-    image: oven/bun:${BUN_TAG}
+    image: oven/bun:1.4.4
     working_dir: /app
     volumes:
       - ./:/app
