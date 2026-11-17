@@ -6,6 +6,40 @@ This repository follows DevGuard's shared [versioning policy](VERSIONING.md): it
 
 For API and web frontend changes see the [main DevGuard CHANGELOG](https://github.com/l3montree-dev/devguard/blob/main/CHANGELOG.md).
 
+## [v1.19.0] — 2026-11-17
+
+### Changed
+
+- Bumped default DevGuard image versions: `devguard` to `v1.19.0`, `devguard-web` to `v1.19.0`, `postgresql` to `16.16`
+- `compose.configure.yaml` pins the `oven/bun` image of the guided setup to `1.4.4`. The `.env` file does not exist yet when the setup runs, so `BUN_TAG` could not be resolved.
+
+### Upgrade notes
+
+- The API migrates the primary keys of asset versions and artifacts to single `uuid` columns, adds the `vuln_state_intervals` table and removes duplicated license risk events. Back up the database before upgrading.
+- Release pages were removed from the web frontend, and the release risk history is no longer calculated.
+
+---
+
+## [v1.18.0] — 2026-11-06
+
+v1.18.0 of this repository was never released. Everything below is included in v1.19.0.
+
+### Changed
+
+- Bumped default DevGuard image versions: `devguard` to `v1.18.2`, `devguard-web` to `v1.18.0`
+- The API no longer requires the `pg_semver` PostgreSQL extension. Its migrations drop the `semver_introduced` and `semver_fixed` columns of `affected_components` and `malicious_affected_components` and re-add them as `bytea`.
+- The API sends its anonymous telemetry ping daily instead of once on startup.
+
+### Added (API)
+
+- Dependency proxy rules are written as CEL expressions, and the proxy now also serves Alpine packages. The Alpine package index is signed with a per-secret key, which existing secrets receive through a backfill migration.
+
+### Fixed (API)
+
+- Out-of-memory kills during the hourly vulnerability scan on dependency graphs with many shared dependencies (v1.18.1).
+
+---
+
 ## [v1.17.0] — 2026-10-26
 
 ### Added
